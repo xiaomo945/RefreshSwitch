@@ -78,7 +78,7 @@ python rebuild_shortcuts.py           # 在桌面生成「刷新率切换」快�
 不会。每次切换都先 TEST 验证，系统拒绝的模式不会强行应用。
 
 **Q：点赞计数是全网的吗？**
-当前是**本机计数**（存在 `%APPDATA%\RefreshSwitch\likes.txt`），同一台机器只 +1 一次。要全网真实累加需要接云端数据库（后续版本考虑）。
+默认是**本机计数**（存在 `%APPDATA%\RefreshSwitch\likes.txt`），同一台机器只 +1 一次。想让全网用户累加同一个真实数字，按上方「☁️ 云端点赞计数」配置 Cloudflare Workers + KV 即可（免费、无需信用卡）。
 
 ---
 
@@ -98,6 +98,19 @@ pyinstaller --noconsole --onefile --name RefreshSwitch ^
 起因是作者有一款用了 10 年的显示器，屏幕边框上贴着 144Hz，就一直以为自己用的是 144Hz。直到 2026.10.13 凌晨，让 AI 帮我改成 144Hz，才知道这十年用的一直是 60Hz——期间换了 CPU、换了主板，打三角洲还是卡，气笑了。
 
 所以做了这个工具，让其他小伙伴们都不要重蹈我的覆辙。如果对你有帮助，希望您能给我个赞赏，让我更有动力！
+
+---
+
+## ☁️ 云端点赞计数（可选 · 免费）
+
+默认点赞是**本机计数**。想让全网用户累加同一个真实数字，用 **Cloudflare Workers + KV** 即可（免费、无需信用卡）：
+
+1. 在 Cloudflare 控制台创建一个 **KV 命名空间**，变量名(binding) 填 `LIKES`；
+2. 把仓库里的 [`likes-worker.js`](likes-worker.js) 部署成 Worker（也可 `wrangler deploy`，配置见 [`wrangler.toml`](wrangler.toml)）；
+3. 将 [`cloud_likes_url.example.txt`](cloud_likes_url.example.txt) 复制为 `cloud_likes_url.txt`，填入你的 Worker 地址（**结尾带 `/`**），放在 `RefreshSwitch.exe` 同目录。
+
+启用后：启动时拉取全局总数，点「赞」会向云端 +1（**本机仍只 +1 一次**，不会重复计数）。Worker 代码只持有 KV 密钥，**exe 里只放公开 URL**，安全。
+未配置时自动退化为纯本机计数，不影响使用。
 
 ---
 

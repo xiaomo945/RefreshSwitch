@@ -29,9 +29,12 @@
 依赖：仅 Python 标准库（tkinter + ctypes），无需第三方包。
 """
 import ctypes
+import json
 import os
 import sys
+import threading
 import tkinter as tk
+import urllib.request
 from tkinter import ttk, messagebox
 
 user32 = ctypes.windll.user32
@@ -394,20 +397,70 @@ def data_path():
     return os.path.join(d, "likes.txt")
 
 
-def load_likes():
+def load_likes_state():
+    """返回 {"liked": 本机是否已贡献过, "global": 最近一次已知的全局点赞数}。
+
+    兼容旧版本：如果文件里只是个整数，按「已点过、全局数=该整数」处理。
+    """
+    default = {"liked": False, "global": 0}
     try:
         with open(data_path(), "r", encoding="utf-8") as f:
-            return max(0, int((f.read().strip() or "0").split("\n")[0]))
+            raw = f.read().strip()
+        if not raw:
+            return default
+        try:
+            d = json.loads(raw)
+            return {"liked": bool(d.get("liked")), "global": int(d.get("global", 0))}
+        except ValueError:
+            n = int(raw)
+            return {"liked": n > 0, "global": n}
     except Exception:
-        return 0
+        return default
 
 
-def save_likes(n):
+def save_likes_state(state):
     try:
         with open(data_path(), "w", encoding="utf-8") as f:
-            f.write(str(n))
+            json.dump(state, f)
     except Exception:
         pass
+
+
+def cloud_likes_url():
+    """云端点赞计数器地址，优先级：环境变量 > 同目录下的 cloud_likes_url.txt。
+
+    没配置则返回 None，此时点赞退化为纯本机计数（不影响使用）。
+    """
+    env = os.environ.get("REFRESH_SWITCH_LIKES_URL")
+    if env and env.strip():
+        return env.strip()
+    base = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
+    p = os.path.join(base, "cloud_likes_url.txt")
+    try:
+        with open(p, "r", encoding="utf-8") as f:
+            u = f.read().strip()
+        return u or None
+    except Exception:
+        return None
+
+
+def fetch_cloud_likes(url):
+    """GET 云端当前总数；失败返回 None。"""
+    try:
+        with urllib.request.urlopen(url, timeout=4) as r:
+            return int((r.read() or b"0").decode().strip() or "0")
+    except Exception:
+        return None
+
+
+def bump_cloud_likes(url):
+    """POST +1，返回新的总数；失败返回 None。"""
+    try:
+        req = urllib.request.Request(url, data=b"", method="POST")
+        with urllib.request.urlopen(req, timeout=4) as r:
+            return int((r.read() or b"0").decode().strip() or "0")
+    except Exception:
+        return None
 
 
 class App:
@@ -593,7 +646,12 @@ class App:
         self.foot.pack(pady=(2, 8))
 
         self.liked = False
-        self.likecount.config(text="已有 %d 人点赞" % load_likes())
+        st = load_likes_state()
+        self.liked = st["liked"]
+        self.likecount.config(text="已有 %d 人点赞" % st["global"])
+        # 后台拉取云端真实总数（不阻塞界面）；拿到后更新显示
+        threading.Thread(target=self._refresh_cloud_likes,
+                        daemon=True).start()
 
         root.bind("<Escape>", lambda e: root.destroy())
         root.bind("<F5>", lambda e: self.rebuild())
@@ -747,22 +805,52 @@ class App:
             t.config(bg=color if on else CARD2,
                      fg="#ffffff" if on else FG)
 
+    def _refresh_cloud_likes(self):
+        """后台拉取云端真实总数并更新底部显示（不阻塞界面）。"""
+        url = cloud_likes_url()
+        if not url:
+            return
+        c = fetch_cloud_likes(url)
+        if c is None:
+            return
+        st = load_likes_state()
+        st["global"] = c
+        save_likes_state(st)
+        try:
+            self.root.after(0, lambda: self.likecount.config(
+                text="已有 %d 人点赞" % c))
+        except Exception:
+            pass
+
     def on_like(self):
-        n = load_likes()
+        st = load_likes_state()
+        url = cloud_likes_url()
         if self.liked:
+            # 已点过：顺手刷新一下云端最新数
+            if url:
+                c = fetch_cloud_likes(url)
+                if c is not None:
+                    st["global"] = c
+                    save_likes_state(st)
+            n = st["global"]
             messagebox.showinfo(
                 "感谢支持",
-                "您已经点过赞啦，感谢！\n\n您是第 %08d 位使用者" % n)
+                "您已经点过赞啦，感谢！\n\n当前已有 %d 人点赞" % n)
             return
-        n += 1
-        save_likes(n)
+        # 首次点赞：云端 +1（未配置/离线时本机兜底 +1）
+        new_n = bump_cloud_likes(url) if url else None
+        if new_n is None:
+            new_n = st["global"] + 1
+        st["liked"] = True
+        st["global"] = new_n
+        save_likes_state(st)
         self.liked = True
-        self.likecount.config(text="已有 %d 人点赞" % n)
+        self.likecount.config(text="已有 %d 人点赞" % new_n)
         messagebox.showinfo(
             "感谢支持",
             "感谢您的点赞，让我更有动力！\n\n"
-            "您是第 %08d 位使用者\n\n"
-            "如果这个小工具帮到了你，也欢迎扫码赞赏作者 ♥" % n)
+            "当前已有 %d 人点赞\n\n"
+            "如果这个小工具帮到了你，也欢迎扫码赞赏作者 ♥" % new_n)
 
     def apply(self, hz):
         w, h = self.target_res

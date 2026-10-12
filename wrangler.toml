@@ -1,0 +1,9 @@
+name = "refreshswitch-likes"
+main = "likes-worker.js"
+compatibility_date = "2024-01-01"
+
+# 在 Cloudflare 控制台创建一个 KV 命名空间，把它的 ID 填到下面，
+# 并把「变量名(binding)」保持为 LIKES（与 Worker 代码一致）。
+[[kv_namespaces]]
+binding = "LIKES"
+id = "YOUR_KV_NAMESPACE_ID"

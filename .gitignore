@@ -14,6 +14,9 @@ env/
 rsbuildenv*/
 rswork*/
 
+# 云端点赞计数器的 Worker 地址（个人部署，勿提交；参考 cloud_likes_url.example.txt）
+cloud_likes_url.txt
+
 # 系统
 .DS_Store
 Thumbs.db

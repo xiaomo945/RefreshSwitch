@@ -1,0 +1,4 @@
+# 把下面这行替换成你部署好的 Cloudflare Worker 地址，然后
+# 把本文件重命名为 cloud_likes_url.txt（去掉 .example）放在 exe 同目录即可启用云端点赞。
+# 注意结尾的斜杠 / 不能少。
+https://refreshswitch-likes.<你的子域名>.workers.dev/
