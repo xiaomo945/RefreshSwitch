@@ -103,4 +103,6 @@ pyinstaller --noconsole --onefile --name RefreshSwitch ^
 
 ## 📄 开源协议
 
-[MIT](LICENSE) © 2026 小莫 (xiaomo945)
+[BSD 3-Clause](LICENSE) © 2026 小莫 (xiaomo945)
+
+> **署名要求**：无论你是重新分发、以二进制形式发布，还是基于本工具改造 / 二次创作，**都必须保留原作者署名（小莫 / xiaomo945）**，不得移除版权声明或将作者据为己有。详见 [LICENSE](LICENSE)。
